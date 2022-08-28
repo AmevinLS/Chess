@@ -1,12 +1,19 @@
+# flake8: noqa
 import numpy as np
 from enum import Enum
 from copy import deepcopy
+
+
 class BadMoveError(Exception):
     pass
+
+
 class Color(Enum):
     NONE = "none"
     WHITE = "white"
     BLACK = "black"
+
+
 class Piece:
     class Kind(Enum):
         EMPTY = "empty"
@@ -18,18 +25,18 @@ class Piece:
         KING = "king"
 
     def __init__(self, kind, color=None):
-        if isinstance(kind, str): # Parsing "kind" argument
+        if isinstance(kind, str):  # Parsing "kind" argument
             self.kind = Piece.Kind(kind)
         elif isinstance(kind, Piece.Kind):
             self.kind = kind
         else:
             raise TypeError(f"Unsupported type {type(kind)} for kind of piece")
 
-        if self.kind == Piece.Kind.EMPTY: # set color to NONE if piece is empty
+        if self.kind == Piece.Kind.EMPTY:  # set color to NONE if piece is empty
             self.color = Color.NONE
             return
 
-        if isinstance(color, str): # Parsing "color" argument
+        if isinstance(color, str):  # Parsing "color" argument
             self.color = Color(color)
         elif isinstance(color, Color):
             self.color = color
@@ -37,7 +44,7 @@ class Piece:
             raise TypeError(f"Unsupported type {type(color)} for color of piece")
 
         if self.kind != Piece.Kind.EMPTY and self.color == Color.NONE:
-            raise ValueError(f"Non-EMPTY piece can't be of color NONE")
+            raise ValueError("Non-EMPTY piece can't be of color NONE")
 
     def __str__(self):
         kind = self.kind
@@ -55,7 +62,6 @@ class Piece:
             return "Q"
         elif kind == Piece.Kind.KING:
             return "K"
-import re
 
 
 class State:
@@ -65,11 +71,14 @@ class State:
             self.board = [[Piece("empty") for _ in range(8)] for _ in range(8)]
             self.color_to_move = Color.WHITE
             self.castle_rights = {
-                Color.WHITE: {"short": True, "long": True}, 
+                Color.WHITE: {"short": True, "long": True},
                 Color.BLACK: {"short": True, "long": True}
             }
         elif state == "initial":
-            backrank_kinds = ["rook", "knight", "bishop", "queen", "king", "bishop", "knight", "rook"]
+            backrank_kinds = [
+                "rook", "knight", "bishop", "queen",
+                "king", "bishop", "knight", "rook"
+            ]
             self.board = []
             self.board.append([Piece(kind, "black") for kind in backrank_kinds])
             self.board.append([Piece("pawn", "black")] * 8)
@@ -79,7 +88,7 @@ class State:
             self.board.append([Piece(kind, "white") for kind in backrank_kinds])
             self.color_to_move = Color.WHITE
             self.castle_rights = {
-                Color.WHITE: {"short": True, "long": True}, 
+                Color.WHITE: {"short": True, "long": True},
                 Color.BLACK: {"short": True, "long": True}
             }
 
@@ -117,7 +126,7 @@ class State:
             Parameters:
                 move ([x1, y1, x2, y2]): Move made in matrix coords
             Returns:
-                [(x0, y0), (x1, y1)] (list of tuples): List of coordinates the  piece would have to go through
+                [(x0, y0), (x1, y1)] (list of tuples): List of coordinates the piece would have to go through
         """
         x1, y1, x2, y2 = move
         x_step = np.sign(x2 - x1)
@@ -141,10 +150,11 @@ class State:
 
     def _execute_move(self, move):
         x1, y1, x2, y2 = move
-        delta_x, delta_y = x2 - x1, y2 - y1
-        
+
         res_state = deepcopy(self)
 
+        # Processing castling
+        delta_y = y2 - y1
         piece = res_state.board[x1][y1]
         if piece.kind == Piece.Kind.KING:
             res_state.castle_rights[piece.color]["short"] = False
@@ -161,10 +171,11 @@ class State:
             elif y1 == 7:
                 res_state.castle_rights[piece.color]["short"] = False
 
+        # Processing the general case
         res_state.board[x2][y2] = res_state.board[x1][y1]
         res_state.board[x1][y1] = Piece("empty")
 
-        res_state.color_to_move = self._get_opposite_color(self.color_to_move) 
+        res_state.color_to_move = self._get_opposite_color(self.color_to_move)
 
         return res_state
 
@@ -232,7 +243,7 @@ class State:
                 continue
             piece = self.board[temp_x][temp_y]
             if piece.kind == Piece.Kind.KING and piece.color == other_color:
-                return True 
+                return True
 
         # Process pawns
         if color == Color.WHITE:
@@ -245,7 +256,7 @@ class State:
                 continue
             piece = self.board[temp_x][temp_y]
             if piece.kind == Piece.Kind.PAWN and piece.color == other_color:
-                return True 
+                return True
 
         return False
 
@@ -254,12 +265,12 @@ class State:
             # Process string of type "a2-a4"
             # TODO: Add regex check for correct type of string
             crds1 = self._square_to_coords(_move[:2])
-            crds2 = self._square_to_coords(_move[-2:]) 
+            crds2 = self._square_to_coords(_move[-2:])
             move = list(crds1) + list(crds2)
         elif isinstance(move, tuple):
             # Process of type ("a2", "a4")
             crds1 = self._square_to_coords(_move[0])
-            crds2 = self._square_to_coords(_move[1]) 
+            crds2 = self._square_to_coords(_move[1])
             move = list(crds1) + list(crds2)
         if not self.is_valid_move(move):
             raise BadMoveError(f"{_move} is not a valid move")
@@ -272,20 +283,20 @@ class State:
         piece = self.board[x1][y1]
         kind = piece.kind
         color = piece.color
-        
-        if color != self.color_to_move: # Only the correct color can move 
+
+        if color != self.color_to_move:  # Only the correct color can move
             return False
-        
-        if self.board[x2][y2].color == self.color_to_move: # You can't move onto your own piece
+
+        if self.board[x2][y2].color == self.color_to_move:  # You can't move onto your own piece
             return False
-            
+
         # First check if move is possible in general
         other_color = self._get_opposite_color(color)
         delta_x = x2 - x1
         delta_y = y2 - y1
         if delta_x == 0 and delta_y == 0:
             return False
-        
+
         if kind == Piece.Kind.PAWN:
             if color == Color.WHITE:
                 attack_deltas = [(-1, -1), (-1, 1)]
@@ -315,22 +326,22 @@ class State:
 
             # TODO: finish possible pawn moves
         elif kind == Piece.Kind.KNIGHT:
-            if (abs(delta_x), abs(delta_y)) not in [(1,2), (2,1)]: # Knights can only move in L-shape
+            if (abs(delta_x), abs(delta_y)) not in [(1, 2), (2, 1)]:  # Knights can only move in L-shape
                 return False
         elif kind == Piece.Kind.BISHOP:
-            if delta_x != delta_y: # Bishops only move diagonally
+            if abs(delta_x) != abs(delta_y):  # Bishops only move diagonally
                 return False
             path = self._get_path(move)
             if not self._is_valid_path(path):
                 return False
         elif kind == Piece.Kind.ROOK:
-            if delta_x != 0 and delta_y != 0: # Rooks only move vertically/horizontally
+            if delta_x != 0 and delta_y != 0:  # Rooks only move vertically/horizontally
                 return False
             path = self._get_path(move)
             if not self._is_valid_path(path):
                 return False
         elif kind == Piece.Kind.QUEEN:
-            if delta_x == 0 or delta_y == 0: # Queens can move diagonally/vertically/horizontally
+            if delta_x == 0 or delta_y == 0:  # Queens can move diagonally/vertically/horizontally
                 pass
             elif abs(delta_x) == abs(delta_y):
                 pass
@@ -340,9 +351,9 @@ class State:
             if not self._is_valid_path(path):
                 return False
         elif kind == Piece.Kind.KING:
-            if (abs(delta_x), abs(delta_y)) in [(0,1), (1,0), (1,1)]:
+            if (abs(delta_x), abs(delta_y)) in [(0, 1), (1, 0), (1, 1)]:
                 pass
-            elif (delta_x, delta_y) == (0, 2): # Process short-castling
+            elif (delta_x, delta_y) == (0, 2):  # Process short-castling
                 if not self.castle_rights[color]["short"]:
                     return False
                 if self._is_check_present(color):
@@ -358,12 +369,12 @@ class State:
                     temp_state.board[temp_x][temp_y - i] = Piece("empty")
                     if temp_state._is_check_present(color):
                         return False
-            elif (delta_x, delta_y) == (0,-2): # Process long-castling
+            elif (delta_x, delta_y) == (0, -2):  # Process long-castling
                 if not self.castle_rights[color]["long"]:
                     return False
                 if self._is_check_present(color):
                     return False
-                if self.board[x1][y1 - 3] != Piece.Kind.EMPTY:
+                if self.board[x1][y1 - 3].kind != Piece.Kind.EMPTY:
                     return False                
                 for i in [-1, -2]:
                     temp_x, temp_y = x1, y1
@@ -373,22 +384,25 @@ class State:
                         return False
                     temp_state = deepcopy(self)
                     temp_state.board[temp_x][temp_y] = temp_state.board[temp_x][temp_y - i]
-                    temp_state.board[temp_x][temp_y - i] = Piece.Kind.EMPTY
+                    temp_state.board[temp_x][temp_y - i] = Piece("empty")
                     if temp_state._is_check_present(color):
                         return False
             else:
                 return False
             # TODO: add possibility for castling
 
-        # Check if the move creates/leaves a check on the player who moved 
+        # Check if the move creates/leaves a check on the player who moved
         temp_state = self._execute_move(move)
         if temp_state._is_check_present(self.color_to_move):
             return False
-        
+
         return True
+
+
 class Game:
     def __init__(self):
         self.move_counter = 0
+        self.history = []
         self.states = [State("initial")]
         return
 
@@ -414,6 +428,7 @@ class Game:
         else:
             self.states.append(new_state)
             self.move_counter += 1
+            self.history.append(move)
             return True
 
     def make_sequence(self, seq):
@@ -428,3 +443,16 @@ class Game:
             if not self.make_move(m):
                 return False
         return True
+
+    def get_board(self):
+        return self.states[-1].board
+    
+    def get_history(self):
+        return self.history
+
+game = Game()
+seq = "e2-e4;e7-e5;d2-d4;d7-d6;b1-c3;g8-f6;c1-g5;f8-e7;d1-g4;h7-h6"
+move = "e1-c1"
+game.make_sequence(seq)
+game.make_move(move)
+print(game)
