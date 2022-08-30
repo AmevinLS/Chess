@@ -22,12 +22,21 @@ SCREEN_HEIGHT = 800
 
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 bg = pygame.image.load("resources/board.png")
+shade = pygame.image.load("resources/shade.png")
 game = chess.Game()
 
 running = True
 while running:
+    # Drawing the background
     screen.blit(bg, (0, 0))
 
+    # Drawing the shade
+    mouse_x, mouse_y = pygame.mouse.get_pos()
+    x = mouse_x // 100 * 100
+    y = mouse_y // 100 * 100
+    screen.blit(shade, (x, y))
+
+    # Drawing the board
     board = game.get_board()
     for i in range(8):
         for j in range(8):
@@ -38,6 +47,7 @@ while running:
             piece_im = pygame.image.load(f"resources/{color_str}_{kind_str}.png")
             screen.blit(piece_im, (100*j, 100*i))
 
+    # Processing events
     for event in pygame.event.get():
         if event.type == MOUSEBUTTONDOWN:
             x_pos, y_pos = pygame.mouse.get_pos()
@@ -46,7 +56,9 @@ while running:
             x_pos, y_pos = pygame.mouse.get_pos()
             to_sqr = convert_coords(y_pos//100, x_pos//100)
             move = f"{from_sqr}-{to_sqr}"
-            game.make_move(move)
+            game.play_move(move)
+            print(game.get_condition())
+            print(game.states[-1].en_peas_sqrs)
         elif event.type == KEYDOWN:
             if event.key == K_ESCAPE:
                 running = False

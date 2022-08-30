@@ -65,6 +65,11 @@ class Piece:
 
 
 class State:
+    class Condition(Enum):
+        ONGOING = "ongoing"
+        CHECKMATE = "checkmate"
+        STALEMATE = "stalemate"
+
     def __init__(self, state="empty"):
         if state == "empty":
             # Create board of empty here
@@ -75,6 +80,7 @@ class State:
                 Color.BLACK: {"short": True, "long": True}
             }
         elif state == "initial":
+            # Create the standard starting position
             backrank_kinds = [
                 "rook", "knight", "bishop", "queen",
                 "king", "bishop", "knight", "rook"
@@ -91,6 +97,8 @@ class State:
                 Color.WHITE: {"short": True, "long": True},
                 Color.BLACK: {"short": True, "long": True}
             }
+            self.condition = State.Condition.ONGOING
+            self.en_peas_sqrs = []
 
     def __str__(self):
         res = ""
@@ -152,9 +160,10 @@ class State:
         x1, y1, x2, y2 = move
 
         res_state = deepcopy(self)
+        
 
         # Processing castling
-        delta_y = y2 - y1
+        delta_x, delta_y = x2 - x1, y2 - y1
         piece = res_state.board[x1][y1]
         if piece.kind == Piece.Kind.KING:
             res_state.castle_rights[piece.color]["short"] = False
@@ -175,8 +184,21 @@ class State:
         res_state.board[x2][y2] = res_state.board[x1][y1]
         res_state.board[x1][y1] = Piece("empty")
 
-        res_state.color_to_move = self._get_opposite_color(self.color_to_move)
+        # Processing pawn stuff
+        res_state.en_peas_sqrs = []
+        if piece.kind == Piece.Kind.PAWN:
+            if abs(delta_x) == 2:
+                res_state.en_peas_sqrs.append((x2 - delta_x//2, y2))
 
+            queening = False
+            if piece.color == Color.WHITE and x2 == 0:
+                queening = True
+            elif piece.color == Color.BLACK and x2 == 7:
+                queening = True 
+            if queening:               
+                res_state.board[x2][y2] = Piece("queen", piece.color)
+
+        res_state.color_to_move = self._get_opposite_color(self.color_to_move)
         return res_state
 
     def _find_king(self, color):
@@ -206,7 +228,7 @@ class State:
                     continue
                 if piece.color == color:
                     break
-                if piece.kind in [Piece.Kind.BISHOP, Piece.Kind.PAWN, Piece.Kind.KNIGHT]:
+                if piece.kind in [Piece.Kind.BISHOP, Piece.Kind.PAWN, Piece.Kind.KNIGHT, Piece.Kind.KING]:
                     break
                 if piece.kind in [Piece.Kind.ROOK, Piece.Kind.QUEEN]:
                     return True
@@ -274,7 +296,19 @@ class State:
             move = list(crds1) + list(crds2)
         if not self.is_valid_move(move):
             raise BadMoveError(f"{_move} is not a valid move")
-        return self._execute_move(move)
+
+        res_state = self._execute_move(move)
+
+        # Changing condition of res_state
+        check_present = res_state._is_check_present(res_state.color_to_move)
+        poss_moves = res_state.get_possible_moves()
+        if len(poss_moves) == 0:
+            if check_present:
+                res_state.condition = State.Condition.CHECKMATE
+            else:
+                res_state.condition = State.Condition.STALEMATE
+        
+        return res_state
 
     def is_valid_move(self, move):
         """Accepts move in form [x1, y1, x2, y2]"""
@@ -311,9 +345,12 @@ class State:
                 return False
             if ((delta_x, delta_y) in push_delta) and (self.board[x2][y2].kind != Piece.Kind.EMPTY):
                 return False
-            if ((delta_x, delta_y) in attack_deltas) and (self.board[x2][y2].color != other_color):
-                return False               
-            if (delta_x, delta_y) in first_push_delta:
+            if ((delta_x, delta_y) in attack_deltas):
+                if (x2, y2) in self.en_peas_sqrs:
+                    pass
+                elif self.board[x2][y2].color != other_color:
+                    return False           
+            elif (delta_x, delta_y) in first_push_delta:
                 if color == Color.WHITE and x1 != 6:
                     return False
                 elif color == Color.BLACK and x1 != 1:
@@ -398,6 +435,22 @@ class State:
 
         return True
 
+    def get_possible_moves(self):
+        all_sqrs = []
+        for i in range(8):
+            for j in range(8):
+                all_sqrs.append([i, j])
+
+        poss_moves = []
+        for sqr1 in all_sqrs:
+            for sqr2 in all_sqrs:
+                move = sqr1 + sqr2
+                if self.is_valid_move(move):
+                    poss_moves.append(move)
+        
+        return poss_moves
+
+
 
 class Game:
     def __init__(self):
@@ -412,7 +465,7 @@ class Game:
         res += f"To-move:\t{self.states[-1].color_to_move}\n"
         return res
 
-    def make_move(self, move):
+    def play_move(self, move):
         """
         Tries to make a move
             Parameters:
@@ -431,7 +484,7 @@ class Game:
             self.history.append(move)
             return True
 
-    def make_sequence(self, seq):
+    def play_sequence(self, seq):
         """
         Tries to make a sequence of moves:
             Parameters:
@@ -450,9 +503,5 @@ class Game:
     def get_history(self):
         return self.history
 
-game = Game()
-seq = "e2-e4;e7-e5;d2-d4;d7-d6;b1-c3;g8-f6;c1-g5;f8-e7;d1-g4;h7-h6"
-move = "e1-c1"
-game.make_sequence(seq)
-game.make_move(move)
-print(game)
+    def get_condition(self):
+        return self.states[-1].condition
