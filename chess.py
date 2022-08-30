@@ -70,7 +70,7 @@ class State:
         CHECKMATE = "checkmate"
         STALEMATE = "stalemate"
 
-    def __init__(self, state="empty"):
+    def __init__(self, state="initial"):
         if state == "empty":
             # Create board of empty here
             self.board = [[Piece("empty") for _ in range(8)] for _ in range(8)]
@@ -189,7 +189,8 @@ class State:
         if piece.kind == Piece.Kind.PAWN:
             if abs(delta_x) == 2:
                 res_state.en_peas_sqrs.append((x2 - delta_x//2, y2))
-
+            elif (x2, y2) in self.en_peas_sqrs:
+                res_state.board[x1][y2] = Piece("empty")
             queening = False
             if piece.color == Color.WHITE and x2 == 0:
                 queening = True
@@ -496,6 +497,9 @@ class Game:
             if not self.make_move(m):
                 return False
         return True
+
+    def get_state(self):
+        return self.states[-1]
 
     def get_board(self):
         return self.states[-1].board

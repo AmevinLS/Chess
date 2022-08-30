@@ -26,9 +26,17 @@ shade = pygame.image.load("resources/shade.png")
 game = chess.Game()
 
 running = True
+checkmate = False
+cm_x_pos = cm_y_pos = 0
 while running:
     # Drawing the background
     screen.blit(bg, (0, 0))
+
+    if checkmate:
+        pygame.draw.rect(
+            screen, (255, 0, 0), 
+            pygame.Rect(cm_x_pos, cm_y_pos, 100, 100)
+        )
 
     # Drawing the shade
     mouse_x, mouse_y = pygame.mouse.get_pos()
@@ -57,8 +65,15 @@ while running:
             to_sqr = convert_coords(y_pos//100, x_pos//100)
             move = f"{from_sqr}-{to_sqr}"
             game.play_move(move)
-            print(game.get_condition())
-            print(game.states[-1].en_peas_sqrs)
+
+            cond = game.get_condition()
+            state = game.get_state()
+            color = state.color_to_move
+            if cond == chess.State.Condition.CHECKMATE:
+                checkmate = True
+                i, j = state._find_king(color)
+                cm_x_pos, cm_y_pos = j * 100, i * 100
+            print(cond)
         elif event.type == KEYDOWN:
             if event.key == K_ESCAPE:
                 running = False
