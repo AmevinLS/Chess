@@ -1,4 +1,5 @@
 import pygame
+import chess_bots
 import chess
 from pygame.locals import (
     KEYDOWN,
@@ -24,6 +25,7 @@ screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 bg = pygame.image.load("resources/board.png")
 shade = pygame.image.load("resources/shade.png")
 game = chess.Game()
+bot = chess_bots.RandomBot()
 
 running = True
 checkmate = False
@@ -34,7 +36,7 @@ while running:
 
     if checkmate:
         pygame.draw.rect(
-            screen, (255, 0, 0), 
+            screen, (255, 0, 0),
             pygame.Rect(cm_x_pos, cm_y_pos, 100, 100)
         )
 
@@ -68,12 +70,16 @@ while running:
 
             cond = game.get_condition()
             state = game.get_state()
+
+            move = bot.get_move(state)
+            game.play_move(move)
+
             color = state.color_to_move
             if cond == chess.State.Condition.CHECKMATE:
                 checkmate = True
                 i, j = state._find_king(color)
                 cm_x_pos, cm_y_pos = j * 100, i * 100
-            print(cond)
+
         elif event.type == KEYDOWN:
             if event.key == K_ESCAPE:
                 running = False

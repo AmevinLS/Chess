@@ -290,11 +290,15 @@ class State:
             crds1 = self._square_to_coords(_move[:2])
             crds2 = self._square_to_coords(_move[-2:])
             move = list(crds1) + list(crds2)
-        elif isinstance(move, tuple):
+        elif isinstance(_move, tuple):
             # Process of type ("a2", "a4")
             crds1 = self._square_to_coords(_move[0])
             crds2 = self._square_to_coords(_move[1])
             move = list(crds1) + list(crds2)
+        elif isinstance(_move, list):
+            # Process list of type [x1, y1, x2, y2]
+            move = _move
+        
         if not self.is_valid_move(move):
             raise BadMoveError(f"{_move} is not a valid move")
 
@@ -451,6 +455,27 @@ class State:
         
         return poss_moves
 
+    def get_imbalance(self):
+        color_mult = {
+            Color.WHITE: 1,
+            Color.BLACK: -1,
+            Color.NONE: 0
+        }
+        piece_values = {
+            Piece.Kind.QUEEN: 9, 
+            Piece.Kind.ROOK: 5, 
+            Piece.Kind.BISHOP: 3,
+            Piece.Kind.KNIGHT: 3,
+            Piece.Kind.PAWN: 1,
+            Piece.Kind.KING: 0,
+            Piece.Kind.EMPTY: 0
+        }
+        res = 0
+        for i in range(8):
+            for j in range(8):
+                piece = self.board[i][j]
+                res += color_mult[piece.color] * piece_values[piece.kind]
+        return res
 
 
 class Game:
