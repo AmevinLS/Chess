@@ -2,6 +2,14 @@
 import numpy as np
 from enum import Enum
 from copy import deepcopy
+import pygame
+from pygame.locals import (
+    KEYDOWN,
+    K_ESCAPE,
+    QUIT,
+    MOUSEBUTTONUP,
+    MOUSEBUTTONDOWN
+)
 
 
 class BadMoveError(Exception):
@@ -108,7 +116,8 @@ class State:
             res += "\n"
         return res
 
-    def _square_to_coords(self, sqr):
+    @staticmethod
+    def _square_to_coords(sqr):
         """
         Returns board coordinate converted to square coordinate
             Parameter:
@@ -119,6 +128,44 @@ class State:
         y = ord(sqr[0]) - ord("a")
         x = 8 - int(sqr[1])
         return (x, y)
+
+    @staticmethod
+    def _coords_to_square(coords):
+        letter = chr(ord("a") + coords[1])
+        number = str(coords[0] + 1)
+        return letter + number
+
+    @staticmethod
+    def move_to_format(_move, format):
+        if isinstance(_move, str):
+            # Process string of type "a2-a4"
+            # TODO: Add regex check for correct type of string
+            if format == "list":
+                crds1 = State._square_to_coords(_move[:2])
+                crds2 = State._square_to_coords(_move[-2:])
+                move = list(crds1) + list(crds2)
+                return move
+            elif format == "string":
+                return _move
+        elif isinstance(_move, tuple):
+            # Process of type ("a2", "a4")
+            if format == "list":
+                crds1 = State._square_to_coords(_move[0])
+                crds2 = State._square_to_coords(_move[1])
+                move = list(crds1) + list(crds2)
+                return move
+            elif format == "string":
+                return _move[0] + "-" + _move[1]
+        elif isinstance(_move, list):
+            # Process list of type [x1, y1, x2, y2]
+            if format == "list":
+                move = _move
+                return move
+            elif format == "string":
+                sqr1 = State._coords_to_square(_move[:2])
+                sqr2 = State._coords_to_square(_move[-2:])
+                return sqr1 + "-" + sqr2
+        raise TypeError(f"Impossible to parse move {_move}")
 
     def _get_opposite_color(self, color):
         if color == Color.WHITE:
@@ -283,22 +330,11 @@ class State:
 
         return False
 
-    def make_move(self, _move):
-        if isinstance(_move, str):
-            # Process string of type "a2-a4"
-            # TODO: Add regex check for correct type of string
-            crds1 = self._square_to_coords(_move[:2])
-            crds2 = self._square_to_coords(_move[-2:])
-            move = list(crds1) + list(crds2)
-        elif isinstance(_move, tuple):
-            # Process of type ("a2", "a4")
-            crds1 = self._square_to_coords(_move[0])
-            crds2 = self._square_to_coords(_move[1])
-            move = list(crds1) + list(crds2)
-        elif isinstance(_move, list):
-            # Process list of type [x1, y1, x2, y2]
-            move = _move
-        
+    def play_move(self, _move):
+        # Convert to standard format
+        move = State.move_to_format(_move, format="list")
+
+        # Check if move is valid
         if not self.is_valid_move(move):
             raise BadMoveError(f"{_move} is not a valid move")
 
@@ -500,14 +536,14 @@ class Game:
                 (bool): whether it was possible to make the move
         """
         try:
-            new_state = self.states[-1].make_move(move)
+            new_state = self.states[-1].play_move(move)
         except BadMoveError:
             print(f"Unable to make move '{move}'")
             return False
         else:
             self.states.append(new_state)
             self.move_counter += 1
-            self.history.append(move)
+            self.history.append(State.move_to_format(move, "string"))
             return True
 
     def play_sequence(self, seq):
@@ -534,3 +570,101 @@ class Game:
 
     def get_condition(self):
         return self.states[-1].condition
+
+
+class GraphicGame(Game):
+    def __init__(self, player1, player2):
+        super().__init__()
+        pygame.init()
+
+        self.players = [player1, player2]
+        self.player_to_move = 0
+        self.move_requested = False
+
+        self.SCREEN_WIDTH = 800
+        self.SCREEN_HEIGHT = 800
+
+        self.screen = pygame.display.set_mode((self.SCREEN_WIDTH, self.SCREEN_HEIGHT))
+        self.board_im = pygame.image.load("resources/board.png")
+        self.shade_im = pygame.image.load("resources/shade.png")
+
+    def main(self):
+        import chessbots
+        running = True
+        checkmate = False
+        human_move_ready = False
+        cm_x_pos = cm_y_pos = 0
+        while running:
+            # Getting variables
+            state = self.get_state()
+            board = self.get_board()
+
+            # Drawing the background
+            self.screen.blit(self.board_im, (0, 0))
+
+            if checkmate:
+                pygame.draw.rect(
+                    self.screen, (255, 0, 0),
+                    pygame.Rect(cm_x_pos, cm_y_pos, 100, 100)
+                )
+
+            # Drawing the shade
+            mouse_x, mouse_y = pygame.mouse.get_pos()
+            x = mouse_x // 100 * 100
+            y = mouse_y // 100 * 100
+            self.screen.blit(self.shade_im, (x, y))
+
+            # Drawing the board
+            for i in range(8):
+                for j in range(8):
+                    kind_str = board[i][j].kind.value
+                    color_str = board[i][j].color.value
+                    if kind_str == "empty":
+                        continue
+                    piece_im = pygame.image.load(f"resources/{color_str}_{kind_str}.png")
+                    self.screen.blit(piece_im, (100*j, 100*i))
+
+            player = self.players[self.player_to_move]
+            if isinstance(player, chessbots.Human):
+                if human_move_ready:
+                    self.play_move(move)
+                    self.player_to_move = (self.player_to_move + 1) % 2
+                    self.move_requested = False
+                    human_move_ready = False
+            else:
+                move_ready = player.is_move_ready()
+                if not self.move_requested:
+                    player.request_move(state)
+                    self.move_requested = True
+                elif move_ready:
+                    move = player.get_move()
+                    self.play_move(move)
+                    self.player_to_move = (self.player_to_move + 1) % 2
+                    self.move_requested = False
+
+            # Processing events
+            for event in pygame.event.get():
+                cond = self.get_condition()
+                if cond == State.Condition.ONGOING: 
+                    if isinstance(player, chessbots.Human):
+                        if event.type == MOUSEBUTTONDOWN:
+                            x_pos, y_pos = pygame.mouse.get_pos()
+                            from_coords = [y_pos//100, x_pos//100]
+                        elif event.type == MOUSEBUTTONUP:
+                            x_pos, y_pos = pygame.mouse.get_pos()
+                            to_coords = [y_pos//100, x_pos//100]
+                            move = from_coords + to_coords
+                            if state.is_valid_move(move):
+                                human_move_ready = True                            
+                elif cond == State.Condition.CHECKMATE:
+                    color = state.color_to_move
+                    checkmate = True
+                    i, j = state._find_king(color)
+                    cm_x_pos, cm_y_pos = j * 100, i * 100
+
+                if event.type == KEYDOWN:
+                    if event.key == K_ESCAPE:
+                        running = False
+                elif event.type == QUIT:
+                    running = False
+            pygame.display.update()
