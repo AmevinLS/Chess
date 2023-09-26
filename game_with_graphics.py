@@ -11,7 +11,7 @@ import cProfile, pstats
 # bot._find_move(game.get_state())
 # profiler.disable()
 
-# stream = open("test.txt", "w")
+# stream = open("test.txt", "w")*
 # stats = pstats.Stats(profiler, stream=stream)
 # stats.sort_stats("cumtime")
 # stats.print_stats()
