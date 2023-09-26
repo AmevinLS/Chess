@@ -16,6 +16,45 @@ class BadMoveError(Exception):
     pass
 
 
+class Move:
+    def __init__(self, _move):
+        if isinstance(_move, Move):
+            self.__dict__ = _move.__dict__.copy()
+        elif isinstance(_move, str):
+            # Process string of type "a2-a4"
+            # TODO: Add regex check for correct type of string
+            crds1 = State._square_to_coords(_move[:2])
+            crds2 = State._square_to_coords(_move[-2:])
+            move = list(crds1) + list(crds2)
+            self.coords = move
+        elif isinstance(_move, tuple):
+            # Process of type ("a2", "a4")
+            crds1 = State._square_to_coords(_move[0])
+            crds2 = State._square_to_coords(_move[1])
+            move = list(crds1) + list(crds2)
+            self.coords = move
+        elif isinstance(_move, list):
+            # Process list of type [x1, y1, x2, y2]
+            self.coords = _move
+        else:
+            raise TypeError(f"Impossible to parse move {_move}")
+    
+    def __str__(self):
+        return self.in_format("string")
+    
+    def __repr__(self):
+        return self.__str__()
+
+    def __iter__(self):
+        return iter(self.coords)
+
+    def in_format(self, form: str):
+        if form == "string":
+            sqr1 = State._coords_to_square(self.coords[:2])
+            sqr2 = State._coords_to_square(self.coords[-2:])
+            return f"{sqr1}-{sqr2}"
+        raise ValueError(f"Invalid value for 'form': {form}")
+
 class Color(Enum):
     NONE = "none"
     WHITE = "white"
@@ -73,6 +112,17 @@ class Piece:
             return "K"
 
 
+ALL_SQRS = []
+for i in range(8):
+    for j in range(8):
+        ALL_SQRS.append([i, j])
+
+ALL_MOVES = []
+for sqr1 in ALL_SQRS:
+    for sqr2 in ALL_SQRS:
+        ALL_MOVES.append(Move(sqr1 + sqr2))
+
+
 class State:
     class Condition(Enum):
         ONGOING = "ongoing"
@@ -89,7 +139,7 @@ class State:
                 Color.BLACK: {"short": True, "long": True}
             }
             self.board = np.array(self.board)
-            
+
         elif state == "initial":
             # Create the standard starting position
             backrank_kinds = [
@@ -138,9 +188,10 @@ class State:
     @staticmethod
     def _coords_to_square(coords):
         letter = chr(ord("a") + coords[1])
-        number = str(coords[0] + 1)
+        number = str(8 - coords[0])
         return letter + number
 
+    # TODO: Maybe move this method to Move class
     @staticmethod
     def move_to_format(_move, format):
         if isinstance(_move, str):
@@ -217,16 +268,16 @@ class State:
 
         # Processing castling
         delta_x, delta_y = x2 - x1, y2 - y1
-        piece = res_state.board[x1][y1]
+        piece = res_state.board[x1, y1]
         if piece.kind == Kind.KING:
             res_state.castle_rights[piece.color]["short"] = False
             res_state.castle_rights[piece.color]["long"] = False
             if delta_y == 2:
-                res_state.board[x2][y2-1] = res_state.board[x2][y2+1]
-                res_state.board[x2][y2+1] = Piece("empty")
+                res_state.board[x2, y2-1] = res_state.board[x2, y2+1]
+                res_state.board[x2, y2+1] = Piece("empty")
             elif delta_y == -2:
-                res_state.board[x2][y2+1] = res_state.board[x2][y2-2]
-                res_state.board[x2][y2-2] = Piece("empty")
+                res_state.board[x2, y2+1] = res_state.board[x2, y2-2]
+                res_state.board[x2, y2-2] = Piece("empty")
         if piece.kind == Kind.ROOK:
             if y1 == 0:
                 res_state.castle_rights[piece.color]["long"] = False
@@ -234,8 +285,8 @@ class State:
                 res_state.castle_rights[piece.color]["short"] = False
 
         # Processing the general case
-        res_state.board[x2][y2] = res_state.board[x1][y1]
-        res_state.board[x1][y1] = Piece("empty")
+        res_state.board[x2, y2] = res_state.board[x1, y1]
+        res_state.board[x1, y1] = Piece("empty")
 
         # Processing pawn stuff
         res_state.en_peas_sqrs = []
@@ -243,66 +294,67 @@ class State:
             if abs(delta_x) == 2:
                 res_state.en_peas_sqrs.append((x2 - delta_x//2, y2))
             elif (x2, y2) in self.en_peas_sqrs:
-                res_state.board[x1][y2] = Piece("empty")
+                res_state.board[x1, y2] = Piece("empty")
             queening = False
             if piece.color == Color.WHITE and x2 == 0:
                 queening = True
             elif piece.color == Color.BLACK and x2 == 7:
                 queening = True 
             if queening:               
-                res_state.board[x2][y2] = Piece("queen", piece.color)
+                res_state.board[x2, y2] = Piece("queen", piece.color)
 
         res_state.color_to_move = self._get_opposite_color(self.color_to_move)
         return res_state
 
+    # TODO: Implement this afater refactoring Move 
     def _do_move_here(self, move):
         x1, y1, x2, y2 = move
 
-        res_state = deepcopy(self)
-        
+        self.backwards_changes = {}
 
         # Processing castling
         delta_x, delta_y = x2 - x1, y2 - y1
-        piece = res_state.board[x1][y1]
+        piece = self.board[x1, y1]
         if piece.kind == Kind.KING:
-            res_state.castle_rights[piece.color]["short"] = False
-            res_state.castle_rights[piece.color]["long"] = False
             if delta_y == 2:
-                res_state.board[x2][y2-1] = res_state.board[x2][y2+1]
-                res_state.board[x2][y2+1] = Piece("empty")
+                self.backwards_changes[(x2, y2-1)] = self.board[x2, y2-1]
+                self.backwards_changes[(x2, y2+1)] = self.board[x2, y2+1]
+                self.board[x2, y2-1] = self.board[x2, y2+1]
+                self.board[x2, y2+1] = Piece("empty")
             elif delta_y == -2:
-                res_state.board[x2][y2+1] = res_state.board[x2][y2-2]
-                res_state.board[x2][y2-2] = Piece("empty")
-        if piece.kind == Kind.ROOK:
-            if y1 == 0:
-                res_state.castle_rights[piece.color]["long"] = False
-            elif y1 == 7:
-                res_state.castle_rights[piece.color]["short"] = False
+                self.backwards_changes[(x2, y2+1)] = self.board[x2, y2+1]
+                self.backwards_changes[(x2, y2-2)] = self.board[x2, y2-2]
+                self.board[x2, y2+1] = self.board[x2, y2-2]
+                self.board[x2, y2-2] = Piece("empty")
 
         # Processing the general case
-        res_state.board[x2][y2] = res_state.board[x1][y1]
-        res_state.board[x1][y1] = Piece("empty")
+        self.backwards_changes[(x2, y2)] = self.board[x2, y2]
+        self.backwards_changes[(x1, y1)] = self.board[x1, y1]
+        self.board[x2, y2] = self.board[x1, y1]
+        self.board[x1, y1] = Piece("empty")
 
         # Processing pawn stuff
-        res_state.en_peas_sqrs = []
         if piece.kind == Kind.PAWN:
             if abs(delta_x) == 2:
-                res_state.en_peas_sqrs.append((x2 - delta_x//2, y2))
+                pass
             elif (x2, y2) in self.en_peas_sqrs:
-                res_state.board[x1][y2] = Piece("empty")
+                self.backwards_changes[(x1, y2)] = self.board[x1, y2]
+                self.board[x1, y2] = Piece("empty")
             queening = False
             if piece.color == Color.WHITE and x2 == 0:
                 queening = True
             elif piece.color == Color.BLACK and x2 == 7:
                 queening = True 
-            if queening:               
-                res_state.board[x2][y2] = Piece("queen", piece.color)
+            if queening:
+                self.backwards_changes[(x2, y2)] = self.board[x2, y2]
+                self.board[x2, y2] = Piece("queen", piece.color)
+        return
 
-        res_state.color_to_move = self._get_opposite_color(self.color_to_move)
-        return res_state
-
-    def _undo_move_here(self, move):
-        pass
+    # TODO: Implement this after refactoring Move
+    def _undo_move_here(self):
+        for coords in self.backwards_changes:
+            x, y = coords
+            self.board[x, y] = self.backwards_changes[coords]
 
     def _find_king(self, color):
         for i in range(len(self.board)):
@@ -387,7 +439,7 @@ class State:
 
     def play_move(self, _move):
         # Convert to standard format
-        move = State.move_to_format(_move, format="list")
+        move = Move(_move)
 
         # Check if move is valid
         if not self.is_valid_move(move):
@@ -496,8 +548,8 @@ class State:
                     if temp_piece.kind != Kind.EMPTY:
                         return False
                     temp_state = deepcopy(self)
-                    temp_state.board[temp_x][temp_y] = temp_state.board[temp_x][temp_y - i]
-                    temp_state.board[temp_x][temp_y - i] = Piece("empty")
+                    temp_state.board[temp_x, temp_y] = temp_state.board[temp_x, temp_y - i]
+                    temp_state.board[temp_x, temp_y - i] = Piece("empty")
                     if temp_state._is_check_present(color):
                         return False
             elif (delta_x, delta_y) == (0, -2):  # Process long-castling
@@ -514,8 +566,8 @@ class State:
                     if temp_piece.kind != Kind.EMPTY:
                         return False
                     temp_state = deepcopy(self)
-                    temp_state.board[temp_x][temp_y] = temp_state.board[temp_x][temp_y - i]
-                    temp_state.board[temp_x][temp_y - i] = Piece("empty")
+                    temp_state.board[temp_x, temp_y] = temp_state.board[temp_x, temp_y - i]
+                    temp_state.board[temp_x, temp_y - i] = Piece("empty")
                     if temp_state._is_check_present(color):
                         return False
             else:
@@ -523,25 +575,19 @@ class State:
             # TODO: add possibility for castling
 
         # Check if the move creates/leaves a check on the player who moved
-        temp_state = self._execute_move(move)
-        if temp_state._is_check_present(self.color_to_move):
+        self._do_move_here(move)
+        if self._is_check_present(self.color_to_move):
+            self._undo_move_here()
             return False
+        self._undo_move_here()
 
         return True
 
     def get_possible_moves(self):
-        all_sqrs = []
-        for i in range(8):
-            for j in range(8):
-                all_sqrs.append([i, j])
-
         poss_moves = []
-        for sqr1 in all_sqrs:
-            for sqr2 in all_sqrs:
-                move = sqr1 + sqr2
-                if self.is_valid_move(move):
-                    poss_moves.append(move)
-        
+        for move in ALL_MOVES:
+            if self.is_valid_move(move):
+                poss_moves.append(move)
         return poss_moves
 
     def get_imbalance(self):
@@ -580,7 +626,7 @@ class Game:
         res += f"To-move:\t{self.states[-1].color_to_move}\n"
         return res
 
-    def play_move(self, move):
+    def play_move(self, _move):
         """
         Tries to make a move
             Parameters:
@@ -589,6 +635,7 @@ class Game:
                 (bool): whether it was possible to make the move
         """
         try:
+            move = Move(_move)
             new_state = self.states[-1].play_move(move)
         except BadMoveError:
             print(f"Unable to make move '{move}'")
@@ -596,7 +643,7 @@ class Game:
         else:
             self.states.append(new_state)
             self.move_counter += 1
-            self.history.append(State.move_to_format(move, "string"))
+            self.history.append(move.in_format("string"))
             return True
 
     def play_sequence(self, seq):

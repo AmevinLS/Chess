@@ -2,18 +2,22 @@ import chessbots
 import chess
 import cProfile, pstats
 
-game = chess.Game()
-bot = chessbots.MinMaxBot(max_depth=2)
+### "Testing" section
+# game = chess.Game()
+# bot = chessbots.MinMaxBot(max_depth=2)
 
-profiler = cProfile.Profile()
-profiler.enable()
-bot._find_move(game.get_state())
-profiler.disable()
+# profiler = cProfile.Profile()
+# profiler.enable()
+# bot._find_move(game.get_state())
+# profiler.disable()
 
-stream = open("test.txt", "w")
-stats = pstats.Stats(profiler, stream=stream)
-stats.sort_stats("cumtime")
-stats.print_stats()
+# stream = open("test.txt", "w")
+# stats = pstats.Stats(profiler, stream=stream)
+# stats.sort_stats("cumtime")
+# stats.print_stats()
 
-# game = chess.GraphicGame(chessbots.Human(), chessbots.Human())
-# game.main()
+
+### "Actual use" section
+# game = chess.GraphicGame(chessbots.Human(), chessbots.MinMaxBot(max_depth=3))
+game = chess.GraphicGame(chessbots.Human(), chessbots.Human())
+game.main()

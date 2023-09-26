@@ -91,9 +91,12 @@ class MinMaxBot(Player):
 
         def build_tree(self, max_depth, depth=0):
             if depth >= max_depth:
+                del self.state
                 return
 
             self._create_childs()
+            color_to_move = self.state.color_to_move
+            del self.state
             for child in self.childs:
                 child.build_tree(max_depth, depth+1)
             # with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
@@ -103,7 +106,7 @@ class MinMaxBot(Player):
             # concurrent.futures.wait(futures)
 
             childs_evals = [child.eval for child in self.childs]
-            if self.state.color_to_move == chess.Color.WHITE:
+            if color_to_move == chess.Color.WHITE:
                 ind = np.argmax(childs_evals)
             else:
                 ind = np.argmin(childs_evals)
