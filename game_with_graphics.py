@@ -18,6 +18,6 @@ import cProfile, pstats
 
 
 ### "Actual use" section
-# game = chess.GraphicGame(chessbots.Human(), chessbots.MinMaxBot(max_depth=3))
-game = chess.GraphicGame(chessbots.Human(), chessbots.Human())
+game = chess.GraphicGame(chessbots.Human(), chessbots.RandomBot())
+# game = chess.GraphicGame(chessbots.Human(), chessbots.Human())
 game.main()

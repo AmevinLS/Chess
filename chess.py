@@ -725,26 +725,27 @@ class GraphicGame(Game):
                     self.screen.blit(piece_im, (100*j, 100*i))
 
             player = self.players[self.player_to_move]
-            if isinstance(player, chessbots.Human):
-                if human_move_ready:
-                    self.play_move(move)
-                    self.player_to_move = (self.player_to_move + 1) % 2
-                    self.move_requested = False
-                    human_move_ready = False
-            else:
-                move_ready = player.is_move_ready()
-                if not self.move_requested:
-                    player.request_move(state)
-                    self.move_requested = True
-                elif move_ready:
-                    move = player.get_move()
-                    self.play_move(move)
-                    self.player_to_move = (self.player_to_move + 1) % 2
-                    self.move_requested = False
+            cond = self.get_condition()
+            if cond == State.Condition.ONGOING:
+                if isinstance(player, chessbots.Human):
+                    if human_move_ready:
+                        self.play_move(move)
+                        self.player_to_move = (self.player_to_move + 1) % 2
+                        self.move_requested = False
+                        human_move_ready = False
+                else:
+                    move_ready = player.is_move_ready()
+                    if not self.move_requested:
+                        player.request_move(state)
+                        self.move_requested = True
+                    elif move_ready:
+                        move = player.get_move()
+                        self.play_move(move)
+                        self.player_to_move = (self.player_to_move + 1) % 2
+                        self.move_requested = False
 
             # Processing events
             for event in pygame.event.get():
-                cond = self.get_condition()
                 if cond == State.Condition.ONGOING: 
                     if isinstance(player, chessbots.Human):
                         if event.type == MOUSEBUTTONDOWN:
