@@ -23,7 +23,7 @@ In `chessbots` module, there are the following types of `Players`:
 
 To make a move in the GUI, you should **click** the piece you want to move and **drag** it to desired position (without releasing mouse) <br> *(side-note): the animation for the moving pieces is not yet implemented*
 
-![](/images/amevin_chess_demo.gif)
+![chess_demo](/images/amevin_chess_demo.gif)
 
 
 ## How to extend
